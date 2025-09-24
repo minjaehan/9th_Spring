@@ -1,9 +1,3 @@
-## 🎯 핵심 키워드
-
-
-
-
-
 - **SOLID**
     
     SOLID : 객체 지향 설계의 5원칙이다. 이 원칙을 지키면 시간이 지나도 변경이 용이하고 유지보와 확장이 쉬운 소프트웨어를 개발할 수 있다.
@@ -69,6 +63,35 @@
     
     이러한 방법은 상속보다 훨씬 유연하다. 단, 한 객체가 다른 객체를 주입받으려면 반드시 DI 컨테이너에 의해 관리되어야 한다.  
     
+    ```java
+    @Component
+    class Engine { void start(){ System.out.println("엔진 시동"); } }
+    
+    @Component
+    class Car {
+        private final Engine engine;
+        Car(Engine engine) { this.engine = engine; } // ✅ 생성자 주입
+        void drive() { engine.start(); }
+    }
+    
+    @SpringBootApplication
+    public class App {
+        public static void main(String[] args) {
+            var ctx = SpringApplication.run(App.class, args);
+            ctx.getBean(Car.class).drive(); // new 없이 컨테이너에서 꺼냄
+        }
+    }
+    ```
+    
+    - `@Component`를 스캔해 **빈(객체)를 생성한다.**
+    - `Car`의 생성자를 보고 **필요한 Engine 빈을 자동 주입한다.**
+    - `new` 대신 **컨테이너에서 꺼내(getBean)** 사용한다.
+        
+        → **객체 생성/연결의 제어권 = 스프링 컨테이너** (IoC), 
+        
+        →주입 동작 = DI
+        
+    
 - **IoC**
     
     ## IoC (Inversion of Control) 이란?
@@ -77,7 +100,7 @@
     
     원래대로라면 개발자가 직접 new를 통해 객체를 생성하고 관리해야 하지만, IoC를 적용하면 이런 객체 생성과 생명주기에 관한 관리 제어권이 개발자에서 스프링으로 넘어간다. 
     
-    즉, 개발자는 “무엇을 할 지”에 집중하고, 언제/어떻게 실행할지는 스프링이 알아서 해주는 구조라고 생각하면 된다.ㅈ
+    즉, 개발자는 “무엇을 할 지”에 집중하고, 언제/어떻게 실행할지는 스프링이 알아서 해주는 구조라고 생각하면 된다.
     
     DI는 IoC를 구현하는 방법 중 하나다. 스프링에서는 IoC를 DI를 통해 구현한다.
     
@@ -85,8 +108,43 @@
     
     객체 생성과 주입을 스프링 컨테이너 즉, DI 컨테이너가 담당하며, 제어권이 개발자에서 스프링으로 넘어가게 되는 것이다. 
     
-- **생성자 주입 vs 수정자, 필드 주입 차이**
+    ```java
+    @Component
+    class A {
+        public void doSomething() {
+            System.out.println("A 동작");
+        }
+    }
     
+    @Component
+    class B {
+        private final A a;
+    
+        @Autowired   // 스프링이 알아서 A를 주입
+        public B(A a) {
+            this.a = a;
+        }
+    
+        public void action() {
+            a.doSomething();
+        }
+    }
+    
+    @SpringBootApplication
+    public class IoCExample {
+        public static void main(String[] args) {
+            var context = SpringApplication.run(IoCExample.class, args);
+            B b = context.getBean(B.class); // new 안 쓰고 컨테이너에서 꺼냄
+            b.action();
+        }
+    }
+    ```
+    
+    - `new` 키워드로 객체를 만들지 않는다
+    - `@Component`와 `@Autowired`를 쓰면 **스프링 IoC 컨테이너가 자동으로 생성 + 주입한다.**
+    - `main`에서도 `new B()` 안 하고 → `context.getBean(B.class)`로 가져온다
+    
+- **생성자 주입 vs 수정자, 필드 주입 차이**
     
     ## 1. 생성자 주입 방법
     
@@ -165,6 +223,79 @@
     
     생성자 주입을 사용하면 어플리케이션 구동 시점에 순환 참조 에러를 예방할 수 있다.  
     
+    ### 예제
+    
+    ```java
+    import org.springframework.stereotype.Component;
+    
+    @Component
+    class Engine {
+        public void start() {
+            System.out.println("엔진 시동");
+        }
+    }
+    ```
+    
+    공통 의존 대상
+    
+    1. 생성자 주입
+    
+    ```java
+    import org.springframework.stereotype.Component;
+    
+    @Component
+    class Car {
+        private final Engine engine;  // 불변성 유지 가능
+    
+        // 생성자를 통해 의존성을 주입받음
+        public Car(Engine engine) {
+            this.engine = engine;
+        }
+    
+        public void drive() {
+            engine.start();
+        }
+    }
+    ```
+    
+    1. 수정자 주입
+    
+    ```java
+    import org.springframework.beans.factory.annotation.Autowired;
+    import org.springframework.stereotype.Component;
+    
+    @Component
+    class Car {
+        private Engine engine;  // null일 수도 있음
+    
+        @Autowired
+        public void setEngine(Engine engine) {
+            this.engine = engine;
+        }
+    
+        public void drive() {
+            engine.start();
+        }
+    }
+    ```
+    
+    1. 필드 주입
+    
+    ```java
+    import org.springframework.beans.factory.annotation.Autowired;
+    import org.springframework.stereotype.Component;
+    
+    @Component
+    class Car {
+        @Autowired
+        private Engine engine;  // 직접 주입
+    
+        public void drive() {
+            engine.start();
+        }
+    }
+    ```
+    
 - **AOP**
     
     ## AOP (Aspect Oriented Programming) 이란?
@@ -188,7 +319,54 @@
     5. Advice : 실제 실행될 부가 기능 코드 
     6. Weaving : pointcut에 따라 Aspect를 핵심 코드에 적용하는 과정
     
-- **서블릿**
+    ### 스프링에서의 AOP
+    
+    스프링 컨테이너가 대상 빈 주변에 **프록시**를 만들어, 외부 호출이 들어올 때 Advice를 실행한 뒤 원본 메서드를 호출한다.
+    
+    - **JDK 동적 프록시**: 인터페이스가 있으면 기본 사용
+    - **CGLIB**: 인터페이스 없으면 하위 클래스를 만들어 프록시 (final 메서드는 가로채기 불가)
+    
+    > 중요 제약
+    > 
+    > - **self-invocation 문제**: 같은 객체의 내부 메서드 호출은 프록시를 못 거침 → AOP 미적용
+    >     - 해결: 메서드를 다른 빈으로 분리하기, 혹은 `@EnableAspectJAutoProxy(exposeProxy = true)` + `((Type) AopContext.currentProxy()).otherMethod()`
+    >     
+    > - **private/final 메서드**: 프록시로 가로채기 어려움 → 공개 메서드 중심 설계
+    
+    - 프록시란 무엇인가?
+        
+        **프록시 = 대리인(대신 처리해주는 객체)**
+        
+        - 원래 객체(Real Object)를 직접 쓰는 대신, **중간에 하나를 더 두고**
+        - 클라이언트는 이 프록시를 통해서만 원본 객체를 호출
+        - 프록시는 요청을 가로채서 **추가 기능(로깅, 보안, 트랜잭션 등)** 을 수행한 다음 원본 객체를 실행
+        
+        👉 즉, **“대리 객체”** 라고 생각하면 된다.
+        
+        스프링에서의 프록시
+        스프링 AOP, @Transactional, @Cacheable 같은 기능이 동작할 때 다 **프록시 객체**를 사용한다. 
+        
+        ```java
+        @Service
+        class OrderService {
+            @Transactional
+            public void placeOrder() {
+                // 주문 로직
+            }
+        }
+        ```
+        
+        - 스프링이 `OrderService`를 그대로 쓰지 않고 → **프록시 객체**를 만들어서 컨테이너에 등록함
+        - 우리가 `getBean(OrderService.class)`로 꺼내 쓰는 건 사실상 “프록시 객체”
+        - 그 프록시는 `placeOrder()`가 호출될 때 **트랜잭션 시작/커밋/롤백** 같은 기능을 추가로 수행함
+        
+        프록시의 장점?
+        
+        - 핵심 로직(비즈니스)과 공통 기능(로깅/트랜잭션 등)을 **분리**
+        - 기존 코드를 바꾸지 않고 **기능 추가** 가능 (OCP 원칙)
+        - 런타임에 유연하게 동작 (스프링이 동적 프록시를 자동으로 생성)
+    
+- 서블릿
     
     ## 서블릿이란?
     
@@ -220,14 +398,6 @@
     
     서블릿은 HTTP 요청과 응답을 처리하고, DI 컨테이너는 객체를 생성/주입하고, 객체의 생애주기를 관리한다. 
     
-    ### 서블릿의 동작 흐름
-    
-    1. 사용자가 브라우저에서 URL을 요청함
-    2. 웹 서버가 요청을 받음 → Tomcat과 같은 WAS에게 전달
-    3. WAS는해당 URL 패턴에 매핑된 서블릿 클래스를 실행
-    4. 서블릿이 요청을 처리 (doGet, doPost 등의 메서드 실행)
-    5. 결과를 HTTPResponse 객체로 클라이언트에게 반환
-    
     - WAS란?
         
         WAS는 웹 서버와 웹 애플리케이션 실행 환경을 합친 개념이다.
@@ -246,6 +416,60 @@
         
          즉, 톰캣은 **서블릿 컨테이너 기능 + WAS 역할**을 동시에 수행한다. 
         
+    
+    스프링에서는 서블릿을 직접 다루지 않고 어노테이션 기반 컨트롤러로 요청/응답을 처리함
+    
+    DispatcherServlet이 중간에서 모든 흐름을 관리함.
+    
+    ```java
+    @Controller
+    public class HelloController {
+    
+        @GetMapping("/hello")
+        public String hello(Model model) {
+            model.addAttribute("username", "홍길동");
+            return "hello"; // → ViewResolver가 hello.html 찾음
+        }
+    }
+    ```
+    
+    - 클라이언트 `/hello` 요청
+    - DispatcherServlet → HandlerMapping → HelloController 실행
+    - Controller가 `model + "hello"` 반환
+    - ViewResolver → `hello.html` 뷰 선택
+    - HTML 렌더링 후 응답
+    
+    ### 1. 톰캣(Tomcat)
+    
+    - **서블릿 컨테이너(Servlet Container)**
+    - 자바 웹 애플리케이션을 실행시켜주는 환경
+    - HTTP 요청을 받아서 **등록된 서블릿에게 전달**하는 게 주 역할
+    - “운영체제 + JVM 위에서 돌아가는 서버 프로그램”이라고 보면 됨
+    
+    👉 톰캣은 “운영자” 같은 존재.
+    
+    ---
+    
+    ### 2. 디스패처서블릿(DispatcherServlet)
+    
+    - **스프링 프레임워크가 제공하는 하나의 서블릿 클래스**
+    - `org.springframework.web.servlet.DispatcherServlet`
+    - 모든 요청을 받아서 → 어떤 컨트롤러를 호출할지 결정하고 → 응답을 뷰로 돌려주는 **프론트 컨트롤러(Front Controller)** 역할
+    
+    👉 DispatcherServlet은 “톰캣에 등록된 서블릿 중 하나”일 뿐.
+    
+    ## 동작 순서 정리
+    
+    1. 브라우저가 `http://localhost:8080/hello` 요청
+    2. **톰캣** (서블릿 컨테이너)이 요청을 받음
+    3. 해당 URL을 처리할 서블릿으로 매핑 → `DispatcherServlet` 호출
+    4. **DispatcherServlet** 이 내부에서
+        - HandlerMapping → Controller 찾기
+        - Controller 실행 → Model 반환
+        - ViewResolver → HTML/JSON 렌더링
+    5. 최종 응답을 톰캣이 브라우저로 전달
+    
+    톰캣이 Dispacherservlet을 실행시키는 구조임
     
 - Optional 클래스
     
@@ -269,6 +493,102 @@
         3. 배열이나 컬렉션 안의 요소가 null일 때
     
     Optional은 메서드가 null을 반환할 수도 있을 때 쓰면 좋다.
+    
+    ## 주요 메서드
+    
+    - `Optional.of(value)`
+        
+        → 값이 절대 `null`이 아닐 때 생성
+        
+    - `Optional.ofNullable(value)`
+        
+        → 값이 `null`일 수도 있을 때 생성
+        
+    - `Optional.empty()`
+        
+        → 비어있는 Optional 생성
+        
+    - `isPresent()`
+        
+        → 값이 있는지 여부 확인
+        
+    - `ifPresent(Consumer)`
+        
+        → 값이 존재할 때만 실행
+        
+    - `orElse(defaultValue)`
+        
+        → 값이 없으면 기본값 반환
+        
+    - `orElseGet(Supplier)`
+        
+        → 값이 없으면 Supplier 실행
+        
+    - `orElseThrow()`
+        
+        → 값이 없으면 예외 발생
+        
+    
+    ### 예제
+    
+    1. 옵셔널 생성
+    
+    ```java
+    import java.util.Optional;
+    
+    public class OptionalExample {
+        public static void main(String[] args) {
+            // 값이 null이 아닌 경우
+            Optional<String> opt1 = Optional.of("Hello");
+            System.out.println(opt1.get()); // Hello
+    
+            // 값이 null일 수도 있는 경우
+            Optional<String> opt2 = Optional.ofNullable(null);
+            System.out.println(opt2.isPresent()); // false
+    
+            // 비어있는 Optional
+            Optional<String> opt3 = Optional.empty();
+            System.out.println(opt3.isPresent()); // false
+        }
+    }
+    ```
+    
+    1. 값 꺼내기 (`orElse`, `orElseGet`, `orElseThrow`)
+    
+    ```java
+    public class OptionalOrElseExample {
+        public static void main(String[] args) {
+            Optional<String> opt = Optional.ofNullable(null);
+    
+            String value1 = opt.orElse("기본값");
+            System.out.println(value1); // 기본값
+    
+            String value2 = opt.orElseGet(() -> "Supplier 기본값");
+            System.out.println(value2); // Supplier 기본값
+    
+            try {
+                String value3 = opt.orElseThrow(() -> new IllegalArgumentException("값이 없음!"));
+                System.out.println(value3);
+            } catch (Exception e) {
+                System.out.println(e.getMessage()); // 값이 없음!
+            }
+        }
+    }
+    
+    ```
+    
+    1. ifPresent 활용
+    
+    ```java
+    public class OptionalIfPresentExample {
+        public static void main(String[] args) {
+            Optional<String> opt = Optional.of("hello");
+    
+            opt.ifPresent(val -> System.out.println("값 있음: " + val));
+            // 출력: 값 있음: hello
+        }
+    }
+    ```
     
 - Stream API
     
@@ -309,4 +629,51 @@
     
     - 함수형 인터페이스란?
         
-        함수를 1급 객체처럼 다룰 수 있게 해 주는 어노테이션으로, 인터페이스에 선언하여 단 하나의 추상 메서드만을 갖도록 제한하는 역할을 한다.
+        함수를 1급 객체처럼 다룰 수 있게 해 주는 어노테이션으로, 인터페이스에 선언하여 단 하나의 추상 메서드만을 갖도록 제한하는 역할을 한다. 
+        
+        1급 객체는 뭐지?
+        
+        프로그래밍 언어에서 어떤 요소(값, 함수, 객체 등)가 **다른 값들과 동등하게 취급될 수 있는 것**을 의미한다.
+        
+        즉, **변수에 할당할 수 있고, 함수의 인자로 넘길 수 있고, 함수의 반환값으로 돌려줄 수 있다면** 그 언어에서 그것은 "1급 객체"라고 부른다.
+        
+    
+    일반적으로 스프링 자체가 Stream API를 강제하지는 않지만, 많은 스프링 프로젝트에서 Stream API가 쓰이는것임!
+    
+    보통 JPA/DB 조회 결과 처리에서 많이 쓰임.
+    
+    람다식이랑 Stream API는 짝꿍인데, Stream API는 전부 함수형 인터페이스를 받도록 설계가 되어있음,, 근데 이 함수형 인터페이스는 전부 람다식으로 구현이 가능함!
+    
+    예제
+    
+    1. 일반적인 for 문
+    
+    ```java
+    public class ForLoopExample {
+        public static void main(String[] args) {
+            List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+    
+            for (Integer n : numbers) {
+                if (n % 2 == 0) {                // 짝수 조건
+                    int squared = n * n;         // 제곱
+                    System.out.println(squared); // 출력
+                }
+            }
+        }
+    }
+    ```
+    
+    1. Stream + 람다를 사용한 방식
+    
+    ```java
+    public class StreamLambdaExample {
+        public static void main(String[] args) {
+            List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5);
+    
+            numbers.stream()
+                   .filter(n -> n % 2 == 0)     // 조건: 짝수만
+                   .map(n -> n * n)             // 변환: 제곱
+                   .forEach(System.out::println); // 출력
+        }
+    }
+    ```
